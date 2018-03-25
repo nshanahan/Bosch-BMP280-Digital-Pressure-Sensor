@@ -18,6 +18,8 @@
 #define F_CPU 16000000UL
 #include <util/delay.h>
 
+#include "Arduino.h"
+
 /***********************************************************
                         Macros
 ***********************************************************/
@@ -187,11 +189,14 @@ bool bmp280_init(void)
 
   //initialize TWI
   i2c_init(DEFAULT_BIT_RATE);
+  
   //verify device has expected chip ID
   err = bmp280_read(CHIP_ID_REG, &chipid, sizeof(uint8_t));
 
   if (chipid != BMP280_CHIP_ID)
   {
+    Serial.print("bmp280_init(): Chip ID = ");
+    Serial.println(chipid, HEX);
     err = true;
   }
 
