@@ -5,11 +5,9 @@
  * @par Nicholas Shanahan (2018)
  *
  * @brief Driver for AVR serial peripheral interface (SPI).
- * Utilizes existing AVR SPI hardware. Driver allows for
- * multiple slave devices (5) when the AVR is configured
- * as the  master (must be on same port). SPI Double Speed mode
- * is not supported by this driver because it does not guarantee
- * reliable operation.
+ * Utilizes existing AVR SPI hardware (not software SPI). 
+ * Driver allows for multiple slave devices each of which may
+ * be addressed by deasserting a unique slave select (SS) line.
  * 
  *************************************************************/
  
@@ -32,13 +30,6 @@
 #define PORT(letter) (CONCAT(PORT,letter))
 #define DDR(letter)  (CONCAT(DDR,letter))
 
-//Set clock polarity
-#define SPI_CPOL_IDLE_HIGH 1
-#define SPI_CPOL_IDLE_LOW  0
-//Set clock phase (sampling edge)
-#define SPI_CPHA_FALLING_EDGE 1
-#define SPI_CPHA_RISING_EDGE  0
-
 //SPI dummy byte value
 #define SPI_DUMMY 0x00
 
@@ -57,6 +48,7 @@ static inline void pull_ss_low(uint8_t pin) __attribute__ ((always_inline));
 static inline void pull_ss_high(uint8_t pin) __attribute__ ((always_inline));
 static inline bool spi_is_busy(void) __attribute__ ((always_inline));
 static uint8_t spi_read_write_byte(uint8_t data);
+static bool spi_write(uint8_t *data, uint8_t size);
 
 /*!
  * @brief Pulls the Slave Select pin low.
@@ -204,24 +196,39 @@ void spi_set_sck_prescaler(spi_sck_t prescale)
   {
     case SPI_SCK_DIV_4:
       SPCR &= ~(_BV(SPR1) | _BV(SPR0));
-      break;
-    
-    case SPI_SCK_DIV_16:
-      SPCR &= ~_BV(SPR1) ;
-      SPCR |= _BV(SPR0);
+      SPSR &= ~_BV(SPI2X);
       break;
       
+    case SPI_SCK_DIV_8:
+      SPCR &= ~_BV(SPR1);
+      SPCR |= _BV(SPR0);
+      SPSR |= _BV(SPI2X);
+    
+    case SPI_SCK_DIV_16:
+      SPCR &= ~_BV(SPR1);
+      SPCR |= _BV(SPR0);
+      SPSR &= ~_BV(SPI2X);
+      break;
+      
+    case SPI_SCK_DIV_32:
+      SPCR |= _BV(SPR1);
+      SPCR &= ~_BV(SPR0);
+      SPSR |= _BV(SPI2X);
+    
     case SPI_SCK_DIV_64:
       SPCR &= ~_BV(SPR0);
       SPCR |= _BV(SPR1);
+      SPSR &= ~_BV(SPI2X);
       break;
     
     case SPI_SCK_DIV_128:
       SPCR |= _BV(SPR1) | _BV(SPR0);
+      SPSR &= ~_BV(SPI2X);
       break;
     
     default:
        SPCR &= ~(_BV(SPR1) | _BV(SPR0));
+       SPSR &= ~_BV(SPI2X);
   }
 }
 

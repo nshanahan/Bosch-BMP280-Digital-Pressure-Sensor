@@ -1,15 +1,13 @@
 /*************************************************************
  *
- * @file spi.c
+ * @file spi.h
  * 
  * @par Nicholas Shanahan (2018)
  *
  * @brief Driver for AVR serial peripheral interface (SPI).
- * Utilizes existing AVR SPI hardware. Driver allows for
- * multiple slave devices (5) when the AVR is configured
- * as the  master (must be on same port). SPI Double Speed mode
- * is not supported by this driver because it does not guarantee
- * reliable operation.
+ * Utilizes existing AVR SPI hardware (not software SPI). 
+ * Driver allows for multiple slave devices each of which may
+ * be addressed by deasserting a unique slave select (SS) line.
  * 
  *************************************************************/
  
@@ -39,22 +37,6 @@ extern "C" {
 #define DD_MISO  4 //Master-In/Slave-Out pin
 #define DD_SCK	 5 //Synchronizing Clock pin
 
-/* SPI Control Register - see section 18.5.1 of Atmel-8272G */
-#define SPIE 7 //SPI Interrupt Enable bit
-#define SPE  6 //SPI Enable bit
-#define DORD 5 //Data Order bit
-#define MSTR 4 //Master/Slave Select bit
-#define CPOL 3 //Clock Polarity bit
-#define CPHA 2 //Clock Phase bit
-#define SPR1 1 //SPI Clock Rate Select bit 1
-#define SPR0 0 //SPI Clock Rate Select bit 0
-
-/* SPI Status Register - see section 18.5.2 of Atmel-8272G */
-#define SPIF  7 //SPI Interrupt Flag
-#define WCOL  6 //Write Collision Flag
-//Bits 5:1 reserved
-#define SPI2X 0 //Double SPI Speed bit
-
 //Data transfer order
 #define SPI_DORD_LSB_FIRST 1
 #define SPI_DORD_MSB_FIRST 0
@@ -73,7 +55,9 @@ typedef enum {
 //SPI Serial Clock (SCK) Prescalers
 typedef enum {
 	SPI_SCK_DIV_4,
+  SPI_SCK_DIV_8,
 	SPI_SCK_DIV_16,
+  SPI_SCK_DIV_32,
 	SPI_SCK_DIV_64,
 	SPI_SCK_DIV_128
 } spi_sck_t;
