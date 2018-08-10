@@ -195,8 +195,6 @@ bool bmp280_init(void)
 
   if (chipid != BMP280_CHIP_ID)
   {
-    Serial.print("bmp280_init(): Chip ID = ");
-    Serial.println(chipid, HEX);
     err = true;
   }
 

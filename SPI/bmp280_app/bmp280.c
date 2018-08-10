@@ -243,7 +243,8 @@ bool bmp280_init(void)
      * https://cdn-shop.adafruit.com/datasheets/BST-BMP280-DS001-11.pdf
      * Section 3.8.2 Table 15
     */
-    err = bmp280_write(CTRL_MEAS_REG, PRESSURE_OVERSAMPLE_X16 | TEMPERATURE_OVERSAMPLE_X2 | NORMAL_MODE);
+    err = bmp280_write(CTRL_MEAS_REG, PRESSURE_OVERSAMPLE_X16 | 
+                       TEMPERATURE_OVERSAMPLE_X2 | NORMAL_MODE);
   }
 
   return err;
