@@ -1,16 +1,14 @@
-/** @file bmp280.c
- *
+/** 
+ * @file bmp280.c
  * @brief Driver for Bosch BMP280 Digital Pressure Sensor.
- *
- * @par
- * Nicholas Shanahan (2018)
-*/
+ */
 
 /***********************************************************
                         Includes
 ***********************************************************/
 #include "bmp280.h"
 #include "i2c.h"
+#include "spi.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -25,7 +23,6 @@
 ***********************************************************/
 #define PRESS_DATA_LEN 3
 #define TEMP_DATA_LEN  3
-#define CAL_PARAM_LEN  (sizeof(calibration_param_t))
 
 //pressure register indices
 #define PRESS_MSB  0
@@ -118,6 +115,19 @@ static int32_t t_fine;
 ***********************************************************/
 static bool bmp280_read(uint8_t addr, uint8_t *buffer, int size);
 static bool bmp280_write(uint8_t addr, uint8_t data);
+static inline int16_t byte_swap(int16_t *data) __attribute__ ((optimize("-O2")));
+
+/*!
+ * @brief Helper method to byte swap 16-bit values
+ * @param[in] data 16-bit value to be byte swapped.
+ * @return Return byte-swapped value.
+ */
+static inline int16_t byte_swap(int16_t data)
+{
+  int16_t tmp = (data >> 8) & 0x00FF;
+  tmp |= ((data << 8) & 0xFF00);
+  return tmp;
+}
 
 /*!
  * @brief Reads an arbitrary number of bytes from the BMP280 device
@@ -125,7 +135,7 @@ static bool bmp280_write(uint8_t addr, uint8_t data);
  * @param[in] addr Register address to begin reading from.
  * @param[in] size Number of bytes to read.
  * @param[out] buffer Buffer data is read into.
- * @return bool
+ * @return Boolean true if read was successful. False, otherwise.
 */
 static bool bmp280_read(uint8_t addr, uint8_t *buffer, int size)
 {
@@ -139,13 +149,22 @@ static bool bmp280_read(uint8_t addr, uint8_t *buffer, int size)
 
   if (!err)
   {
+#if BMP280_TWI
     //tell slave which register will be read
-    err = i2c_write(BMP280_I2C_ADDR, (uint8_t *)&addr, sizeof(uint8_t), true);
-  }
-
-  if (!err)
-  {
-    err = i2c_read(BMP280_I2C_ADDR, buffer, size, false);
+    err = i2c_write(BMP280_I2C_ADDR, (uint8_t*)&addr, sizeof(addr), true);
+    //read data
+    err |= i2c_read(BMP280_I2C_ADDR, buffer, size, false);
+#else
+    addr |= SPI_READ_MASK;
+    //initiate SPI transfer
+    spi_master_begin(BMP280_SS);
+    //tell BMP280 which address to start reading from
+    err = spi_master_write((uint8_t*)&addr, sizeof(addr));
+    //read consecutive registers
+    err |= spi_master_read(buffer, size);
+    //end SPI transfer
+    spi_master_end(BMP280_SS);
+#endif
   }
 
   return err;
@@ -155,7 +174,7 @@ static bool bmp280_read(uint8_t addr, uint8_t *buffer, int size)
  * @brief Writes a byte of data to the BMP280 device.
  * @param[in] addr Register address to write to.
  * @param[in] data Data value to write.
- * @return bool
+ * @return Boolean true if write was successful. False, otherwise.
 */
 static bool bmp280_write(uint8_t addr, uint8_t data)
 {
@@ -168,10 +187,22 @@ static bool bmp280_write(uint8_t addr, uint8_t data)
 
   if (!err)
   {
+#if BMP280_TWI
     //write register address
-    err = i2c_write(BMP280_I2C_ADDR, (uint8_t *)&addr, sizeof(uint8_t), true);
+    err = i2c_write(BMP280_I2C_ADDR, (uint8_t*)&addr, sizeof(addr), true);
     //write data value
-    err |= i2c_write(BMP280_I2C_ADDR, (uint8_t *)&data, sizeof(uint8_t), false);
+    err |= i2c_write(BMP280_I2C_ADDR, (uint8_t*)&data, sizeof(data), false);
+#else
+    addr &= SPI_WRITE_MASK;
+    //initiate SPI transfer
+    spi_master_begin(BMP280_SS);
+    //tell BMP280 which register to write
+    err = spi_master_write((uint8_t*)&addr, sizeof(addr));
+    //write data to BM280 register
+    err |= spi_master_write((uint8_t*)&data, sizeof(data));
+    //end SPI transfer
+    spi_master_end(BMP280_SS);
+#endif
   }
 
   return err;
@@ -185,52 +216,81 @@ bool bmp280_init(void)
 {
   bool err = false;
   uint8_t chipid = 0;
-  uint8_t data[CAL_PARAM_LEN];
+  uint8_t ctrl = 0;
+  int16_t data;
 
+#if BMP280_TWI
   //initialize TWI
   i2c_init(DEFAULT_BIT_RATE);
+#else
+  //slave device pin mask
+  uint8_t ss_mask = _BV(BMP280_SS);
+  //initialize SPI
+  spi_master_init(ss_mask, SPI_DORD_MSB_FIRST, SPI_MODE_0);
+#endif
   
   //verify device has expected chip ID
-  err = bmp280_read(CHIP_ID_REG, &chipid, sizeof(uint8_t));
+  err = bmp280_read(CHIP_ID_REG, &chipid, sizeof(chipid));
 
   if (chipid != BMP280_CHIP_ID)
   {
+    Serial.println("Failed to locate BM280 sensor.");
+    Serial.print("Sensor ID: ");
+    Serial.println(chipid, HEX);
     err = true;
   }
 
   if (!err)
   {
     _delay_ms(1);
-    //read all 12 calibration registers
-    err = bmp280_read(DIG_T1_REG, (uint8_t *)&data, CAL_PARAM_LEN);
+	  //read calibration data one register a time
+	  //want to avoid making two copies of calibration data in memory
+    //sensor returns LSB first so everything has to be byte-swapped
+    err = bmp280_read(DIG_T1_REG, (uint8_t*)&data, sizeof(data));
+	  calibration.dig_T1 = (uint16_t)byte_swap(data);
 
-    if (!err)
-    {
-      calibration.dig_T1 = (data[1] << 8) | data[0];
-      calibration.dig_T2 = (data[3] << 8) | data[2];
-      calibration.dig_T3 = (data[5] << 8) | data[4];
-      calibration.dig_P1 = (data[7] << 8) | data[6];
-      calibration.dig_P2 = (data[9] << 8) | data[8];
-      calibration.dig_P3 = (data[11] << 8) | data[10];
-      calibration.dig_P4 = (data[13] << 8) | data[12];
-      calibration.dig_P5 = (data[15] << 8) | data[14];
-      calibration.dig_P6 = (data[17] << 8) | data[16];
-      calibration.dig_P7 = (data[19] << 8) | data[18];
-      calibration.dig_P8 = (data[21] << 8) | data[20];
-      calibration.dig_P9 = (data[23] << 8) | data[22];
-    }
+	  err |= bmp280_read(DIG_T2_REG, (uint8_t*)&data, sizeof(data));
+	  calibration.dig_T2 = byte_swap(data);
+
+	  err |= bmp280_read(DIG_T3_REG, (uint8_t*)&data, sizeof(data));
+	  calibration.dig_T3 = byte_swap(data);
+	
+	  err |= bmp280_read(DIG_P1_REG, (uint8_t*)&data, sizeof(data));
+	  calibration.dig_P1 = (uint16_t)byte_swap(data);
+	
+	  err |= bmp280_read(DIG_P2_REG, (uint8_t*)&data, sizeof(data));
+	  calibration.dig_P2 = byte_swap(data);
+	
+	  err |= bmp280_read(DIG_P3_REG, (uint8_t*)&data, sizeof(data));
+	  calibration.dig_P3 = byte_swap(data);
+	
+	  err |= bmp280_read(DIG_P4_REG, (uint8_t*)&data, sizeof(data));
+	  calibration.dig_P4 = byte_swap(data);
+	
+	  err |= bmp280_read(DIG_P5_REG, (uint8_t*)&data, sizeof(data));
+	  calibration.dig_P5 = byte_swap(data);
+	
+	  err |= bmp280_read(DIG_P6_REG, (uint8_t*)&data, sizeof(data));
+	  calibration.dig_P6 = byte_swap(data);
+	
+	  err |= bmp280_read(DIG_P7_REG, (uint8_t*)&data, sizeof(data));
+	  calibration.dig_P7 = byte_swap(data);
+	
+	  err |= bmp280_read(DIG_P8_REG, (uint8_t*)&data, sizeof(data));
+	  calibration.dig_P8 = byte_swap(data);
+	
+	  err |= bmp280_read(DIG_P9_REG, (uint8_t*)&data, sizeof(data));
+	  calibration.dig_P9 = byte_swap(data);
   }
-
+ /*
+  * Recommended settings for ultra high resolution, low-power, hand-held devices.
+  * https://cdn-shop.adafruit.com/datasheets/BST-BMP280-DS001-11.pdf
+  * Section 3.8.2 Table 15
+  */
   if (!err)
   {
-    /*
-     * control register settings recommended for ultra high resolution,
-     * low-power, handheld devices.
-     * https://cdn-shop.adafruit.com/datasheets/BST-BMP280-DS001-11.pdf
-     * Section 3.8.2 Table 15
-    */
-    err = bmp280_write(CTRL_MEAS_REG, PRESSURE_OVERSAMPLE_X16 |
-                       TEMPERATURE_OVERSAMPLE_X2 | NORMAL_MODE);
+	  ctrl = PRESSURE_OVERSAMPLE_X16 | TEMPERATURE_OVERSAMPLE_X2 | NORMAL_MODE;
+    err = bmp280_write(CTRL_MEAS_REG, ctrl);
   }
 
   return err;
@@ -245,11 +305,11 @@ float bmp280_getTemperature(void)
   uint8_t data[TEMP_DATA_LEN];
 
   //read 20 bit uncompensated temperature
-  err = bmp280_read(TEMP_MSB_REG, (uint8_t*)&data, TEMP_DATA_LEN);
+  err = bmp280_read(TEMP_MSB_REG, data, sizeof(data));
 
   if (!err)
   {
-    //format temperature data (** Needs to be done in steps like this! **)
+    //format temperature data
     uncomp_temp = data[TEMP_MSB];
     uncomp_temp <<= 8;
     uncomp_temp |= data[TEMP_LSB];
@@ -281,11 +341,12 @@ float bmp280_getPressure(void)
   uint32_t uncomp_press = 0;
   float press = 0;
   uint8_t data[PRESS_DATA_LEN];
+  int64_t p;
 
   //must read temperature first
   bmp280_getTemperature();
   //read 20 bit uncompensated pressure
-  err = bmp280_read(PRESS_MSB_REG, (uint8_t*)&data, PRESS_DATA_LEN);
+  err = bmp280_read(PRESS_MSB_REG, data, sizeof(data));
 
   if (!err)
   {
@@ -298,8 +359,7 @@ float bmp280_getPressure(void)
      * compensate pressure
      * https://cdn-shop.adafruit.com/datasheets/BST-BMP280-DS001-11.pdf
      * Section 3.11.3
-    */
-    int64_t p;
+    */ 
     int32_t adc_P = uncomp_press;
     adc_P >>= 4;
     int64_t var1 = ((int64_t)t_fine) - 128000;

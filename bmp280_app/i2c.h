@@ -1,10 +1,8 @@
-/** @file i2c.h
+/*! 
+ * \file i2c.c
  *
- * @brief Driver for AVR I2C interface. Only supports 
- * Master Transmitter and Master Receiver modes.
- *
- * @par
- * Nicholas Shanahan (2018)
+ * \brief Driver for AVR I2C interface. Only supports
+ *  Master Transmitter and Master Receiver modes.
  *
  */
  

@@ -43,11 +43,11 @@ void setup()
 
 void loop()
 {
-  float t_celcius = bmp280_getTemperature();
+  float t_celsius = bmp280_getTemperature();
   float pressure = bmp280_getPressure();
 
    //convert temperature to Fahrenheit
-  float t_fahrenheit = ((t_celcius * 9) / 5) + 32;
+  float t_fahrenheit = ((t_celsius * 9) / 5) + 32;
 
   Serial.print("Temperature (ºF): ");
   Serial.println(t_fahrenheit, 4);
