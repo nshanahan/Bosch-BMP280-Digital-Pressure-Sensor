@@ -243,44 +243,44 @@ bool bmp280_init(void)
   if (!err)
   {
     _delay_ms(1);
-	  //read calibration data one register a time
-	  //want to avoid making two copies of calibration data in memory
+    //read calibration data one register a time
+    //want to avoid making two copies of calibration data in memory
     //sensor returns LSB first so everything has to be byte-swapped
     err = bmp280_read(DIG_T1_REG, (uint8_t*)&data, sizeof(data));
-	  calibration.dig_T1 = (uint16_t)byte_swap(data);
+    calibration.dig_T1 = (uint16_t)byte_swap(data);
 
-	  err |= bmp280_read(DIG_T2_REG, (uint8_t*)&data, sizeof(data));
-	  calibration.dig_T2 = byte_swap(data);
+    err |= bmp280_read(DIG_T2_REG, (uint8_t*)&data, sizeof(data));
+    calibration.dig_T2 = byte_swap(data);
 
-	  err |= bmp280_read(DIG_T3_REG, (uint8_t*)&data, sizeof(data));
-	  calibration.dig_T3 = byte_swap(data);
-	
-	  err |= bmp280_read(DIG_P1_REG, (uint8_t*)&data, sizeof(data));
-	  calibration.dig_P1 = (uint16_t)byte_swap(data);
-	
-	  err |= bmp280_read(DIG_P2_REG, (uint8_t*)&data, sizeof(data));
-	  calibration.dig_P2 = byte_swap(data);
-	
-	  err |= bmp280_read(DIG_P3_REG, (uint8_t*)&data, sizeof(data));
-	  calibration.dig_P3 = byte_swap(data);
-	
-	  err |= bmp280_read(DIG_P4_REG, (uint8_t*)&data, sizeof(data));
-	  calibration.dig_P4 = byte_swap(data);
-	
-	  err |= bmp280_read(DIG_P5_REG, (uint8_t*)&data, sizeof(data));
-	  calibration.dig_P5 = byte_swap(data);
-	
-	  err |= bmp280_read(DIG_P6_REG, (uint8_t*)&data, sizeof(data));
-	  calibration.dig_P6 = byte_swap(data);
-	
-	  err |= bmp280_read(DIG_P7_REG, (uint8_t*)&data, sizeof(data));
-	  calibration.dig_P7 = byte_swap(data);
-	
-	  err |= bmp280_read(DIG_P8_REG, (uint8_t*)&data, sizeof(data));
-	  calibration.dig_P8 = byte_swap(data);
-	
-	  err |= bmp280_read(DIG_P9_REG, (uint8_t*)&data, sizeof(data));
-	  calibration.dig_P9 = byte_swap(data);
+    err |= bmp280_read(DIG_T3_REG, (uint8_t*)&data, sizeof(data));
+    calibration.dig_T3 = byte_swap(data);
+  
+    err |= bmp280_read(DIG_P1_REG, (uint8_t*)&data, sizeof(data));
+    calibration.dig_P1 = (uint16_t)byte_swap(data);
+  
+    err |= bmp280_read(DIG_P2_REG, (uint8_t*)&data, sizeof(data));
+    calibration.dig_P2 = byte_swap(data);
+  
+    err |= bmp280_read(DIG_P3_REG, (uint8_t*)&data, sizeof(data));
+    calibration.dig_P3 = byte_swap(data);
+  
+    err |= bmp280_read(DIG_P4_REG, (uint8_t*)&data, sizeof(data));
+    calibration.dig_P4 = byte_swap(data);
+  
+    err |= bmp280_read(DIG_P5_REG, (uint8_t*)&data, sizeof(data));
+    calibration.dig_P5 = byte_swap(data);
+  
+    err |= bmp280_read(DIG_P6_REG, (uint8_t*)&data, sizeof(data));
+    calibration.dig_P6 = byte_swap(data);
+  
+    err |= bmp280_read(DIG_P7_REG, (uint8_t*)&data, sizeof(data));
+    calibration.dig_P7 = byte_swap(data);
+  
+    err |= bmp280_read(DIG_P8_REG, (uint8_t*)&data, sizeof(data));
+    calibration.dig_P8 = byte_swap(data);
+  
+    err |= bmp280_read(DIG_P9_REG, (uint8_t*)&data, sizeof(data));
+    calibration.dig_P9 = byte_swap(data);
   }
  /*
   * Recommended settings for ultra high resolution, low-power, hand-held devices.
@@ -289,7 +289,7 @@ bool bmp280_init(void)
   */
   if (!err)
   {
-	  ctrl = PRESSURE_OVERSAMPLE_X16 | TEMPERATURE_OVERSAMPLE_X2 | NORMAL_MODE;
+    ctrl = PRESSURE_OVERSAMPLE_X16 | TEMPERATURE_OVERSAMPLE_X2 | NORMAL_MODE;
     err = bmp280_write(CTRL_MEAS_REG, ctrl);
   }
 
